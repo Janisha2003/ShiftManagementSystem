@@ -15,7 +15,24 @@ load_dotenv(
 
 from app.backend.config import Config
 
-
+def create_database_if_not_exists(app):g
+    if app.config.get('TESTING'):
+        return
+    import pymysql
+    user = os.environ.get('DB_USER', 'root')
+    password = os.environ.get('DB_PASSWORD', '')
+    host = os.environ.get('DB_HOST', 'localhost')
+    port = int(os.environ.get('DB_PORT', 3306))
+    db_name = os.environ.get('DB_NAME', 'shift_db')
+    try:
+        conn = pymysql.connect(host=host, user=user, password=password, port=port)
+        cursor = conn.cursor()
+        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
+        conn.commit()
+        cursor.close()
+        conn.close()
+    except Exception as e:
+        app.logger.error(f"Database auto-creation warning: {str(e)}")
 
 def create_app(config_class=Config):
     app = Flask(__name__)
