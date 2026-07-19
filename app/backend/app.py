@@ -34,7 +34,6 @@ def create_app(config_class=Config):
     # Register global error handler
     app.register_error_handler(Exception, handle_api_error)
 
-    # Bootstrapping logic inside application context
    # Bootstrapping logic inside application context
     with app.app_context():
         try:
