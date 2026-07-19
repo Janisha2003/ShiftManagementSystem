@@ -35,15 +35,16 @@ def create_app(config_class=Config):
     app.register_error_handler(Exception, handle_api_error)
 
     # Bootstrapping logic inside application context
-   with app.app_context():
-    try:
-        db.create_all()
+   # Bootstrapping logic inside application context
+    with app.app_context():
+        try:
+            db.create_all()
 
-        if not app.config.get('TESTING'):
-            seed_database()
+            if not app.config.get('TESTING'):
+                seed_database()
 
-    except Exception as e:
-        app.logger.error(f"Error during database initialization: {str(e)}")
+        except Exception as e:
+            app.logger.error(f"Error during database initialization: {str(e)}")
 
     return app
 
