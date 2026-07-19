@@ -15,30 +15,12 @@ load_dotenv(
 
 from app.backend.config import Config
 
-def create_database_if_not_exists(app):
-    if app.config.get('TESTING'):
-        return
-    import pymysql
-    user = os.environ.get('DB_USER', 'root')
-    password = os.environ.get('DB_PASSWORD', '')
-    host = os.environ.get('DB_HOST', 'localhost')
-    port = int(os.environ.get('DB_PORT', 3306))
-    db_name = os.environ.get('DB_NAME', 'shift_db')
-    try:
-        conn = pymysql.connect(host=host, user=user, password=password, port=port)
-        cursor = conn.cursor()
-        cursor.execute(f"CREATE DATABASE IF NOT EXISTS {db_name}")
-        conn.commit()
-        cursor.close()
-        conn.close()
-    except Exception as e:
-        app.logger.error(f"Database auto-creation warning: {str(e)}")
+
 
 def create_app(config_class=Config):
     app = Flask(__name__)
     app.config.from_object(config_class)
-    create_database_if_not_exists(app)
-
+    
     # Initialize extensions
     db.init_app(app)
     jwt.init_app(app)
@@ -53,34 +35,15 @@ def create_app(config_class=Config):
     app.register_error_handler(Exception, handle_api_error)
 
     # Bootstrapping logic inside application context
-    with app.app_context():
-        try:
-            # Disable foreign key checks to allow dropping tables with relationships in MySQL
-            try:
-                db.session.execute(db.text("SET FOREIGN_KEY_CHECKS = 0;"))
-                db.session.commit()
-            except Exception:
-                pass
+   with app.app_context():
+    try:
+        db.create_all()
 
-            # Drop all tables first to force ENUM column updates in MySQL
-            db.drop_all()
+        if not app.config.get('TESTING'):
+            seed_database()
 
-            # Re-enable foreign key checks
-            try:
-                db.session.execute(db.text("SET FOREIGN_KEY_CHECKS = 1;"))
-                db.session.commit()
-            except Exception:
-                pass
-
-            # Create tables if they do not exist
-            db.create_all()
-            
-            # Seed default records if database is empty and not in testing
-            if not app.config.get('TESTING'):
-                seed_database()
-            
-        except Exception as e:
-            app.logger.error(f"Error during database initialization: {str(e)}")
+    except Exception as e:
+        app.logger.error(f"Error during database initialization: {str(e)}")
 
     return app
 
