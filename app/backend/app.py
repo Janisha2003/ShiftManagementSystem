@@ -27,21 +27,20 @@ def create_app(config_class=Config):
     
     # Configure CORS to allow access from Vite frontend
     cors.init_app(app, resources={r"/api/*": {"origins": "*"}})
-
     # Register blueprints (routes)
-register_blueprints(app)
+    register_blueprints(app)
 
-@app.route("/")
-def home():
-    return jsonify({
-        "status": "success",
-        "message": "Shift Management System API is running"
-    })
+    @app.route("/")
+    def home():
+        return jsonify({
+            "status": "success",
+            "message": "Shift Management System API is running"
+        })
 
-# Register global error handler
-app.register_error_handler(Exception, handle_api_error)
+    # Register global error handler
+    app.register_error_handler(Exception, handle_api_error)
 
-   # Bootstrapping logic inside application context
+    # Bootstrapping logic inside application context
     with app.app_context():
         try:
             db.create_all()
