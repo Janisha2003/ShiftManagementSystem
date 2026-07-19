@@ -89,7 +89,7 @@ const Employees = () => {
       first_name: emp.first_name,
       last_name: emp.last_name,
       email: emp.email,
-      password: 'dummy-password', // Don't show hashed password
+      password: '',
       phone: emp.phone || '',
       department_id: emp.department_id || '',
       role_id: emp.role_id || '',
@@ -185,10 +185,10 @@ const Employees = () => {
           <p>Provision user credentials, assign departments, and manage structural roles.</p>
         </div>
         <div style={actionsContainerStyle}>
-          <Button variant="outline" onClick={() => setIsDeptModalOpen(true)}>
+          <Button variant="outline" onClick={() => { setError(''); setIsDeptModalOpen(true); }}>
             <FolderPlus size={16} /> Department
           </Button>
-          <Button variant="outline" onClick={() => setIsRoleModalOpen(true)}>
+          <Button variant="outline" onClick={() => { setError(''); setIsRoleModalOpen(true); }}>
             <Award size={16} /> Job Role
           </Button>
           <Button variant="primary" onClick={openAddEmpModal}>

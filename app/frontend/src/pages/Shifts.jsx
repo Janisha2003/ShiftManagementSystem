@@ -55,34 +55,44 @@ const Shifts = () => {
   useEffect(() => {
     if (selectedMonday) {
       calculateWeekDays(selectedMonday);
-      fetchRosterData();
+      fetchRosterData(selectedMonday);
     }
   }, [selectedMonday]);
 
+  // Parse YYYY-MM-DD as local time to avoid UTC offset shifting day
+  const parseLocalDate = (dateStr) => new Date(dateStr + 'T00:00:00');
+
   const calculateWeekDays = (mondayStr) => {
-    const start = new Date(mondayStr);
+    const start = parseLocalDate(mondayStr);
     const days = [];
     for (let i = 0; i < 7; i++) {
       const nextDay = new Date(start);
       nextDay.setDate(start.getDate() + i);
+      const y = nextDay.getFullYear();
+      const m = String(nextDay.getMonth() + 1).padStart(2, '0');
+      const d = String(nextDay.getDate()).padStart(2, '0');
       days.push({
-        dateStr: nextDay.toISOString().split('T')[0],
+        dateStr: `${y}-${m}-${d}`,
         label: nextDay.toLocaleDateString('en-US', { weekday: 'short', month: 'numeric', day: 'numeric' })
       });
     }
     setWeekDays(days);
   };
 
-  const fetchRosterData = async () => {
+  const fetchRosterData = async (monday) => {
+    const mondayStr = monday || selectedMonday;
     setLoading(true);
     try {
-      const start = selectedMonday;
-      const end = new Date(new Date(selectedMonday).setDate(new Date(selectedMonday).getDate() + 6)).toISOString().split('T')[0];
-      
+      const startDate = parseLocalDate(mondayStr);
+      const endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6);
+      const pad = (n) => String(n).padStart(2, '0');
+      const endStr = `${endDate.getFullYear()}-${pad(endDate.getMonth() + 1)}-${pad(endDate.getDate())}`;
+
       const [empRes, shiftRes, allocRes] = await Promise.all([
         client.get('/api/employees'),
         client.get('/api/shifts'),
-        client.get(`/api/shifts/allocations?start_date=${start}&end_date=${end}`)
+        client.get(`/api/shifts/allocations?start_date=${mondayStr}&end_date=${endStr}`)
       ]);
 
       setEmployees(empRes.data.filter(e => e.status === 'active'));
@@ -96,9 +106,12 @@ const Shifts = () => {
   };
 
   const handleWeekChange = (direction) => {
-    const current = new Date(selectedMonday);
+    const current = parseLocalDate(selectedMonday);
     current.setDate(current.getDate() + (direction === 'next' ? 7 : -7));
-    setSelectedMonday(current.toISOString().split('T')[0]);
+    const y = current.getFullYear();
+    const m = String(current.getMonth() + 1).padStart(2, '0');
+    const d = String(current.getDate()).padStart(2, '0');
+    setSelectedMonday(`${y}-${m}-${d}`);
   };
 
   const getShiftBadge = (empId, dateStr) => {
@@ -139,7 +152,7 @@ const Shifts = () => {
       await client.post('/api/shifts/allocations/manual', manualForm);
       addToast("Shift Assigned", "Manual override allocation saved successfully.", "success");
       setIsManualModalOpen(false);
-      fetchRosterData();
+      fetchRosterData(selectedMonday);
     } catch (err) {
       setError(err.response?.data?.message || 'Failed to save manual allocation');
       addToast("Assignment Error", err.response?.data?.message || "Failed to save shift override.", "error");
@@ -152,29 +165,32 @@ const Shifts = () => {
     e.preventDefault();
     setError('');
     setActionLoading(true);
-    
-    const steps = [
-      { percent: 15, text: "Clearing existing assignments for target week..." },
-      { percent: 42, text: "Checking approved employee leave conflicts..." },
-      { percent: 68, text: "Running shift rotation algorithm & balancing workloads..." },
-      { percent: 88, text: "Validating consecutive-shift constraints..." },
-      { percent: 100, text: "Saving assignments & syncing with backend database..." }
-    ];
 
     try {
-      // Simulate algorithm calculation stages
+      // Real API call first
+      await client.post('/api/shifts/allocations/auto', autoForm);
+
+      // Show progress animation after success
+      const steps = [
+        { percent: 20, text: "Clearing existing assignments for target week..." },
+        { percent: 45, text: "Checking approved employee leave conflicts..." },
+        { percent: 70, text: "Running shift rotation algorithm & balancing workloads..." },
+        { percent: 90, text: "Validating consecutive-shift constraints..." },
+        { percent: 100, text: "Allocation saved successfully!" }
+      ];
+
       for (const step of steps) {
         setProgress(step);
-        await new Promise(r => setTimeout(r, 600 + Math.random() * 300));
+        await new Promise(r => setTimeout(r, 300));
       }
 
-      await client.post('/api/shifts/allocations/auto', autoForm);
       addToast("Roster Generated", "Shift allocation completed and published for week.", "success");
       setIsAutoModalOpen(false);
-      fetchRosterData();
+      fetchRosterData(selectedMonday);
     } catch (err) {
-      setError(err.response?.data?.message || 'Failed to run auto-allocation');
-      addToast("Roster Error", err.response?.data?.message || "Failed to run auto-scheduler.", "error");
+      const msg = err.response?.data?.message || 'Failed to run auto-allocation';
+      setError(msg);
+      addToast("Roster Error", msg, "error");
     } finally {
       setActionLoading(false);
       setProgress(null);
@@ -282,7 +298,7 @@ const Shifts = () => {
       </Modal>
 
       {/* 2. Auto-Scheduler Modal */}
-      <Modal isOpen={isAutoModalOpen} onClose={() => !actionLoading && setIsAutoModalOpen(false)} title="Automatic Weekly Shift Allocation">
+      <Modal isOpen={isAutoModalOpen} onClose={() => setIsAutoModalOpen(false)} title="Automatic Weekly Shift Allocation">
         {progress ? (
           <div style={{ padding: '2rem 1rem', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
             <RefreshCw size={36} color="var(--primary-color)" style={{ animation: 'spin 1.5s linear infinite', marginBottom: '1rem' }} />

@@ -1,10 +1,19 @@
 from flask import Flask, jsonify
-from app.backend.config import Config
 from app.backend.extensions import db, jwt, cors
 from app.backend.routes import register_blueprints
 from app.backend.middleware import handle_api_error
 import os
+import logging
 from datetime import timedelta
+from dotenv import load_dotenv
+
+# Force load .env before anything else
+load_dotenv(
+    dotenv_path=os.path.join(os.path.dirname(__file__), '..', '..', '.env'),
+    override=True
+)
+
+from app.backend.config import Config
 
 def create_database_if_not_exists(app):
     if app.config.get('TESTING'):
@@ -247,6 +256,38 @@ def seed_database():
 
 # Expose app instance for runner script (e.g. flask run)
 app = create_app()
+
+# ── APScheduler — Weekly Shift Notification Job ──────────────────────────────
+def _start_scheduler(flask_app):
+    """Starts APScheduler with the weekly notification cron job (Sunday 21:00)."""
+    try:
+        from apscheduler.schedulers.background import BackgroundScheduler
+        from apscheduler.triggers.cron import CronTrigger
+        from app.backend.services.notification_service import run_weekly_notification_job
+
+        scheduler = BackgroundScheduler(timezone="Asia/Kolkata")
+        scheduler.add_job(
+            func    = run_weekly_notification_job,
+            trigger = CronTrigger(day_of_week="sun", hour=21, minute=0),
+            id      = "weekly_shift_notification",
+            name    = "Weekly Shift WhatsApp Notification",
+            replace_existing = True,
+        )
+        scheduler.start()
+        logging.getLogger(__name__).info(
+            "APScheduler started — weekly shift notification scheduled for Sunday 21:00 IST"
+        )
+        flask_app.scheduler = scheduler
+    except ImportError:
+        logging.getLogger(__name__).warning(
+            "APScheduler not installed. Run: pip install apscheduler"
+        )
+    except Exception as exc:
+        logging.getLogger(__name__).error("Failed to start APScheduler: %s", exc)
+
+
+if not app.config.get("TESTING"):
+    _start_scheduler(app)
 
 if __name__ == '__main__':
     # Run the application

@@ -146,7 +146,7 @@ def delete_employee(emp_id):
         return jsonify({'message': 'Failed to delete employee profile', 'error': str(e)}), 500
 
 
-# Departments CRUD helper endpoints
+# Departments CRUD helper endpoints — must be defined BEFORE /<emp_id> routes
 @employee_bp.route('/departments', methods=['GET'])
 @jwt_required()
 def list_departments():
