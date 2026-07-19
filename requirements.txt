@@ -9,3 +9,4 @@ pytest
 reportlab
 requests
 apscheduler
+gunicorn
